@@ -2,6 +2,7 @@ package com.mitchwongho.d3;
 
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.os.Build;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.view.Menu;
@@ -30,7 +31,7 @@ import butterknife.InjectView;
 
 public class MainActivity extends ActionBarActivity {
 
-    @InjectView( R.id.webview)
+    @InjectView(R.id.webview)
     WebView webview;
 
     public class WebAppInterface {
@@ -77,11 +78,15 @@ public class MainActivity extends ActionBarActivity {
         final WebSettings ws = webview.getSettings();
         ws.setJavaScriptEnabled(true);
         ws.setPluginState(WebSettings.PluginState.ON);
+        ws.setPluginState(WebSettings.PluginState.ON);
         ws.setAllowFileAccess(true);
         ws.setDomStorageEnabled(true);
         ws.setAllowContentAccess(true);
         ws.setAllowFileAccessFromFileURLs(true);
         ws.setAllowUniversalAccessFromFileURLs(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            WebView.setWebContentsDebuggingEnabled(true);
+        }
         webview.setWebViewClient(new WebViewClient());
         webview.setWebChromeClient(new WebChromeClient());
         webview.addJavascriptInterface( new WebAppInterface( this ), "Android");

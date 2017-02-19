@@ -1,14 +1,185 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML Basic 1.1//EN"
-        "http://www.w3.org/TR/xhtml-basic/xhtml-basic11.dtd">
+<!doctype html>
+<html>
+	<head>
+	<title>D3 Genealogy by Sheriff</title>
 
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-</head>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
 
-<body/>
-<link rel="stylesheet" type="text/css" href="d3.css">
-<script src="d3.v3.min.js"></script>
-<script src="d3.tip.v0.6.3.js"></script>
-<script src="d3-bar.js"></script>
+	<style type="text/css">
+		.navbar { border-radius:0; }
+
+		body {
+			margin: 0;
+			padding: 0;
+			font-family: Arial, serif;
+			font-size: 12px;
+
+			background-color: #eee;
+		}
+
+		.node circle {
+			fill: #fff;
+			stroke: steelblue;
+			stroke-width: 1.5px;
+		}
+
+		.node { cursor: pointer;  }
+
+		path.link {
+			fill: none;
+			stroke: #ccc;
+		}
+
+	</style>
+
+	<script master src="js/d3.js"></script>
+	<script master src="js/d3.layout.js"></script>
+	<script master src="http://code.angularjs.org/1.2.13/angular.js"></script>
+	<script master src="http://cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.8/angular-ui-router.min.js"></script>
+	<!--script src="http://code.jquery.com/jquery-latest.min.js"></script-->
+	</head>
+
+	<body ng-app="d3">
+
+	<div ui-view></div>
+
+<script type="text/javascript">
+
+var app = angular.module('d3', ['ui.router']);
+
+app.config(function($stateProvider, $urlRouterProvider) {
+
+	// // //
+	$urlRouterProvider.otherwise('/person/1')
+	// $urlRouterProvider.otherwise('/person/' + (localStorage.userId || 1))
+	// // //
+
+	$stateProvider
+	.state('person', {
+		url: '/person/:ids',
+		// template: 'Hi There<div ui-view></div>',
+		templateUrl: 'partials-chart.html',
+		controller: 'ChartController'
+	})
+
+})
+
+
+app.controller('ChartController', ['$scope', '$stateParams', function($scope, $stateParams) {
+
+	var ids = $stateParams.ids.split(',');
+	var userId = ids[ids.length - 1];
+
+	$scope.pathIndices = [];
+	$scope.path = [];
+
+	var w = 640,
+		h = 600;
+
+	var tree = d3.layout.tree()
+				.size(w, h);
+
+	var viz = d3.select('#chart').append('svg:svg')
+				.attr('width', w)
+				.attr('height', h)
+				.append('svg:g')
+				.attr('transform', 'translate(20,20)')
+
+	// $.support.cors = true;
+	// jQuery.getJSON('http://localhost/api/v1/relations/' + userId + '?ids=' + ids + '&callback=?', function(data) {
+
+	d3.json('http://139.59.63.232/api/v1/relations/' + userId + '?ids=' + ids, function(data) {
+
+		var root = {
+			ids: ids,
+			id: userId,
+			name: data.name || 'You',
+			children: data.relations
+		};
+
+		$scope.path = data.names || ids || [''];
+
+		renderChart(root);
+
+		$scope.$digest();
+	});
+
+
+	function renderChart(root) {
+
+		var nodes = tree.nodes(root) // .reverse();
+		var pad = 40;
+		var dst = (h - (pad * 2)) / (nodes.length - 1);
+
+		viz.selectAll('g.node').remove();
+
+		var node = viz.selectAll('g.node')
+						.data(nodes, function(d, i){
+							d.x = 50 + (d.depth * 150);
+							d.y = d.depth == 0? (h / 2): (i * dst);
+						});
+
+		var duration = 60;
+		//=============== node ====================
+		var nodeEnter = node.enter().append('svg:g')
+			.attr('class', 'node')
+			.attr('transform', function(d) {
+					return 'translate('+d.x+','+d.y+')'
+				})
+			.on('click', function(d) {
+
+				var index = root.ids.indexOf('' + d.id);
+
+				if (index > -1) {
+					root.ids.splice(index + 1);
+					// root.names.splice(index + 1);
+				} else {
+					root.ids.push(d.id);
+					// root.names.push(d.name);
+				}
+
+				location.href = '#' + '/person/' + root.ids; //  + ',' + d.id;
+			})
+
+		nodeEnter.append('svg:circle')
+			.attr('r', '4.5')
+
+		nodeEnter.append('svg:text')
+			.text(function(d){ return d.name; })
+			.attr('y', '0.3em')
+			.attr('x', function(d) { return d.depth == 0 ? "-10" : "10"; })
+			.attr("text-anchor", function(d) { return d.depth == 0 ? "end" : "start"; })
+
+		node.exit().remove();
+
+		//================ path ======================
+		viz.selectAll('path.link').remove()
+
+		var link = viz.selectAll('path.link')
+					.data(tree.links(nodes), function(d){ return d.id; });
+
+		var diagonal = d3.svg.diagonal()
+			// .projection(function(d) { return [d.x, d.y]; });
+			.source(function(d) { return {"x":d.source.y, "y":d.source.x}; })
+			.target(function(d) { return {"x":d.target.y, "y":d.target.x}; })
+			.projection(function(d) { return [d.y, d.x]; });
+
+		link.enter().insert('svg:path', 'g')
+			.attr('class', 'link')
+			.attr('d', diagonal)
+
+		link.exit()
+			//.transition()
+			//.duration(duration)
+			.remove();
+
+	}
+
+
+}])
+
+</script>
+
+	</body>
+</html>
